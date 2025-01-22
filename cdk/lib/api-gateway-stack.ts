@@ -789,7 +789,7 @@ export class ApiGatewayStack extends cdk.Stack {
       {
         parameterName: `/${id}/DSA/BedrockLLMId`,
         description: "Parameter containing the Bedrock LLM ID",
-        stringValue: "meta.llama3-70b-instruct-v1:0",
+        stringValue: "us.meta.llama3-2-90b-instruct-v1:0",
       }
     );
     const embeddingModelParameter = new ssm.StringParameter(
@@ -951,11 +951,20 @@ export class ApiGatewayStack extends cdk.Stack {
     // Custom policy statement for Bedrock access
     const bedrockPolicyStatement = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
-      actions: ["bedrock:InvokeModel", "bedrock:InvokeEndpoint"],
-      resources: [
-        "arn:aws:bedrock:" +
-          this.region +
-          "::foundation-model/meta.llama3-70b-instruct-v1:0",
+      actions: ["bedrock:InvokeModel", "bedrock:InvokeEndpoint","bedrock:CreateInferenceProfile", "bedrock:GetInferenceProfile","bedrock:InvokeModelWithResponseStream",
+                "bedrock:ListInferenceProfiles",
+                "bedrock:DeleteInferenceProfile",
+                "bedrock:TagResource",
+                "bedrock:UntagResource",
+                "bedrock:ListTagsForResource"],
+      resources: ["arn:aws:bedrock:*::foundation-model/*",
+                "arn:aws:bedrock:*:*:inference-profile/*",
+                "arn:aws:bedrock:*:*:application-inference-profile/*",
+                 "arn:aws:bedrock:*:*:inference-profile/*",
+                "arn:aws:bedrock:*:*:application-inference-profile/*",
+        // "arn:aws:bedrock:" +
+        //   this.region +
+        //   "::foundation-model/us.meta.llama3-3-70b-instruct-v1:0",
         "arn:aws:bedrock:" +
           this.region +
           "::foundation-model/amazon.titan-embed-text-v2:0",
