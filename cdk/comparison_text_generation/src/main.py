@@ -37,11 +37,58 @@ TABLE_NAME = None
 # Cached embeddings instance
 embeddings = None
 
-def invoke_event_notification(session_id, message):
+# def invoke_event_notification(session_id, message):
+#     """
+#     Publish a notification event to AppSync via HTTPX (directly to the AppSync API).
+#     """
+#     try:
+#         query = """
+#         mutation sendNotification($message: String!, $sessionId: String!) {
+#             sendNotification(message: $message, sessionId: $sessionId) {
+#                 message
+#                 sessionId
+#             }
+#         }
+#         """
+#         headers = {
+#             "Content-Type": "application/json",
+#             "Authorization": "API_KEY"
+#         }
+
+#         payload = {
+#             "query": query,
+#             "variables": {
+#                 "message": message,
+#                 "sessionId": session_id
+#             }
+#         }
+
+#         # Send the request to AppSync
+#         with httpx.Client() as client:
+#             response = client.post(APPSYNC_API_URL, headers=headers, json=payload)
+#             response_data = response.json()
+
+#             logging.info(f"AppSync Response: {json.dumps(response_data, indent=2)}")
+#             if response.status_code != 200 or "errors" in response_data:
+#                 raise Exception(f"Failed to send notification: {response_data}")
+
+#             print(f"Notification sent successfully: {response_data}")
+#             return response_data["data"]["sendNotification"]
+
+#     except Exception as e:
+#         logging.error(f"Error publishing event to AppSync: {str(e)}")
+#         raise
+
+def invoke_event_notification_stream(session_id, full_message):
     """
-    Publish a notification event to AppSync via HTTPX (directly to the AppSync API).
+    Publish streaming notification events to AppSync via HTTPX (directly to the AppSync API).
+
+    Args:
+        session_id (str): The session identifier for the WebSocket connection.
+        full_message (str): The full message to be streamed as chunks.
     """
     try:
+        # Define the GraphQL mutation
         query = """
         mutation sendNotification($message: String!, $sessionId: String!) {
             sendNotification(message: $message, sessionId: $sessionId) {
@@ -50,33 +97,39 @@ def invoke_event_notification(session_id, message):
             }
         }
         """
+
         headers = {
             "Content-Type": "application/json",
-            "Authorization": "API_KEY"
+            "Authorization": "API_KEY",  # Replace with your actual AppSync API key or token
         }
 
-        payload = {
-            "query": query,
-            "variables": {
-                "message": message,
-                "sessionId": session_id
+        # Define the chunk size for streaming (e.g., 200 characters)
+        chunk_size = 200
+        chunks = [full_message[i:i + chunk_size] for i in range(0, len(full_message), chunk_size)]
+
+        # Stream each chunk
+        for chunk in chunks:
+            payload = {
+                "query": query,
+                "variables": {
+                    "message": chunk,
+                    "sessionId": session_id
+                }
             }
-        }
 
-        # Send the request to AppSync
-        with httpx.Client() as client:
-            response = client.post(APPSYNC_API_URL, headers=headers, json=payload)
-            response_data = response.json()
+            # Send the chunk to AppSync
+            with httpx.Client() as client:
+                response = client.post(APPSYNC_API_URL, headers=headers, json=payload)
+                response_data = response.json()
 
-            logging.info(f"AppSync Response: {json.dumps(response_data, indent=2)}")
-            if response.status_code != 200 or "errors" in response_data:
-                raise Exception(f"Failed to send notification: {response_data}")
+                logging.info(f"AppSync Response: {json.dumps(response_data, indent=2)}")
+                if response.status_code != 200 or "errors" in response_data:
+                    raise Exception(f"Failed to send notification: {response_data}")
 
-            print(f"Notification sent successfully: {response_data}")
-            return response_data["data"]["sendNotification"]
+                print(f"Chunk sent successfully: {chunk}")
 
     except Exception as e:
-        logging.error(f"Error publishing event to AppSync: {str(e)}")
+        logging.error(f"Error streaming event to AppSync: {str(e)}")
         raise
 
 def get_secret(secret_name, expect_json=True):
@@ -315,9 +368,15 @@ def handler(event, context):
                 retriever=ordinary_retriever,
                 guidelines_file=guidelines
             )
-            print(f"User role {user_role} logged in engagement log.")
-            print(f"response from llm", response)
-            invoke_event_notification(session_id, response.get("llm_output", "LLM failed to create response"))
+            # print(f"User role {user_role} logged in engagement log.")
+            # print(f"response from llm", response)
+            for chunk in response:
+                print(chunk)
+            invoke_event_notification_stream(session_id, chunk)
+
+
+
+            # invoke_event_notification(session_id, response.get("llm_output", "LLM failed to create response"))
             # Delete the collection from the user_uploaded_vectorstore after the embeddings have been used for evaluation
             if user_uploaded_vectorstore:
                 user_uploaded_vectorstore.delete_collection()
@@ -353,7 +412,7 @@ def handler(event, context):
                 },
             "body": json.dumps({
                 "type": "ai",
-                "content": response.get("llm_output", "LLM failed to create response"),
+                # "content": response.get("llm_output", "LLM failed to create response"),
                 "options": [],
                 "user_role": user_role
             })
