@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+
 import Header from "../Header";
 import MainMessage from "./MainMessage";
 import OptionMessage from "./OptionMessage";
@@ -114,25 +115,179 @@ const Chat = ({ setPage }) => {
     return `${urlObj.toString()}?header=${encodedHeader}&payload=${payload}`;
   };
 
-  const sendMessage = async (
-    content,
-    isOption = false,
-    isComparison = false
-  ) => {
+  // const sendMessage = async (content, isOption = false, isComparison = false) => {
+  //   if (!session || !fingerprint || (!content.trim() && !isOption)) return;
+  //   const currentMessages = [...messages];
+  //   const userRole = getUserRole(currentMessages);
+  //   if (!isOption && currentMessages.length === 1) {
+  //     toast.error("Please select one of the options first!");
+  //     return;
+  //   }
+  //   setMessageInput("");
+  //   setIsLoading(true);
+  
+  //   try {
+  //     const userMessage = { Type: "human", Content: content };
+  //     setMessages((prev) => [...prev, userMessage]);
+  
+  //     const requestBody = isComparison
+  //       ? {
+  //           comparison: true,
+  //           message_content: content,
+  //           user_role: getUserRole([...currentMessages, userMessage]),
+  //           criteria: selectedCriteria,
+  //         }
+  //       : {
+  //           message_content: content,
+  //           user_role: getUserRole([...currentMessages, userMessage]),
+  //         };
+  
+  //     const response = await fetch(
+  //       `${
+  //         process.env.NEXT_PUBLIC_API_ENDPOINT
+  //       }user/text_generation?session_id=${encodeURIComponent(
+  //         session
+  //       )}&user_info=${encodeURIComponent(fingerprint)}`,
+  //       {
+  //         method: "POST",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //         },
+  //         body: JSON.stringify(requestBody),
+  //       }
+  //     );
+  
+  //     if (!response.ok) {
+  //       const error = await response.json();
+  //       console.log("response", error);
+  //       throw new Error(error || `HTTP error! status: ${response.status}`);
+  //     }
+  
+  //     const data = await response.json();
+  
+  //     if (isComparison) {
+  //       const wsUrl = constructCompTextGenWebSocketUrl();
+  //       const ws = new WebSocket(wsUrl, "graphql-ws");
+    
+  //       let ongoingMessageIndex = null; // To track the ongoing AI message index
+  //       const receivedChunks = new Set(); // To track unique chunks and prevent duplicates
+    
+  //       try {
+  //         await new Promise((resolve, reject) => {
+  //           ws.onopen = () => {
+  //             console.log("WebSocket connection established");
+    
+  //             // Initialize the WebSocket connection
+  //             const initMessage = { type: "connection_init" };
+  //             console.log("Sent:", initMessage);
+  //             ws.send(JSON.stringify(initMessage));
+    
+  //             // Send the subscription message
+  //             const subscriptionMessage = {
+  //               id: session,
+  //               type: "start",
+  //               payload: {
+  //                 data: `{"query":"subscription OnNotify($sessionId: String!) { onNotify(sessionId: $sessionId) { message sessionId } }","variables":{"sessionId":"${session}"}}`,
+  //                 extensions: {
+  //                   authorization: {
+  //                     Authorization: "API_KEY=", // Replace with your actual API key
+  //                     host: new URL(process.env.NEXT_PUBLIC_APPSYNC_API_URL).hostname,
+  //                   },
+  //                 },
+  //               },
+  //             };
+  //             console.log("Sent:", subscriptionMessage);
+  //             ws.send(JSON.stringify(subscriptionMessage));
+  //           };
+    
+  //           ws.onmessage = (event) => {
+  //             const message = JSON.parse(event.data);
+  //             console.log("Received:", message);
+    
+  //             if (message.type === "data" && message.payload?.data?.onNotify) {
+  //               const receivedMessage = message.payload.data.onNotify.message;
+    
+  //               if (!receivedChunks.has(receivedMessage)) {
+  //                 receivedChunks.add(receivedMessage); // Add to the set to avoid duplicates
+    
+  //                 setMessages((prev) => {
+  //                   const newMessages = [...prev];
+    
+  //                   if (
+  //                     ongoingMessageIndex === null || // No ongoing index
+  //                     ongoingMessageIndex >= newMessages.length || // Invalid index
+  //                     newMessages[ongoingMessageIndex]?.Type !== "ai" // Wrong message type
+  //                   ) {
+  //                     // Start a new AI message block
+  //                     ongoingMessageIndex = newMessages.length;
+  //                     newMessages.push({
+  //                       Type: "ai",
+  //                       Content: receivedMessage,
+  //                     });
+  //                   } else {
+  //                     // Append to the existing AI message block if unique
+  //                     const currentContent = newMessages[ongoingMessageIndex].Content;
+  //                     if (!currentContent.endsWith(receivedMessage)) {
+  //                       newMessages[ongoingMessageIndex].Content += receivedMessage;
+  //                     }
+  //                   }
+    
+  //                   return newMessages;
+  //                 });
+  //               } else {
+  //                 console.warn("Duplicate message skipped:", receivedMessage);
+  //               }
+  //             } else {
+  //               console.warn("Unexpected WebSocket message:", message);
+  //             }
+  //           };
+    
+  //           ws.onerror = (error) => {
+  //             console.error("WebSocket error:", error);
+  //             ws.close();
+  //             reject(error); // Reject the promise
+  //           };
+    
+  //           ws.onclose = () => {
+  //             console.log("WebSocket connection closed");
+  //             resolve(); // Resolve the promise on close
+  //           };
+    
+  //           // Set a timeout to reject the promise if the connection hangs
+  //           setTimeout(() => {
+  //             console.error("WebSocket connection timeout");
+  //             ws.close();
+  //             reject(new Error("WebSocket connection timeout"));
+  //           }, 180000); // 3 minutes timeout
+  //         });
+  //       } catch (error) {
+  //         console.error("Error handling WebSocket:", error.message);
+  //         toast.error(error.message);
+  //       } finally {
+  //         ws.close(); // Ensure WebSocket is closed in all cases
+  //         setIsLoading(false);
+  //       }
+    
+  // };
+
+  const sendMessage = async (content, isOption = false, isComparison = false) => {
     if (!session || !fingerprint || (!content.trim() && !isOption)) return;
+  
     const currentMessages = [...messages];
     const userRole = getUserRole(currentMessages);
+  
     if (!isOption && currentMessages.length === 1) {
       toast.error("Please select one of the options first!");
       return;
     }
+  
     setMessageInput("");
     setIsLoading(true);
+  
     try {
       const userMessage = { Type: "human", Content: content };
       setMessages((prev) => [...prev, userMessage]);
-
-      // Prepare the request body conditionally
+  
       const requestBody = isComparison
         ? {
             comparison: true,
@@ -144,11 +299,9 @@ const Chat = ({ setPage }) => {
             message_content: content,
             user_role: getUserRole([...currentMessages, userMessage]),
           };
-
+  
       const response = await fetch(
-        `${
-          process.env.NEXT_PUBLIC_API_ENDPOINT
-        }user/text_generation?session_id=${encodeURIComponent(
+        `${process.env.NEXT_PUBLIC_API_ENDPOINT}user/text_generation?session_id=${encodeURIComponent(
           session
         )}&user_info=${encodeURIComponent(fingerprint)}`,
         {
@@ -159,183 +312,133 @@ const Chat = ({ setPage }) => {
           body: JSON.stringify(requestBody),
         }
       );
-
+  
       if (!response.ok) {
         const error = await response.json();
         console.log("response", error);
         throw new Error(error || `HTTP error! status: ${response.status}`);
       }
-
-      const data = await response.json();
-
-      // setMessages((prev) => [
-      //   ...prev,
-      //   {
-      //     Type: "ai",
-      //     Content: data.content,
-      //     Options: data.options || [],
-      //     user_role: data.user_role,
-      //   },
-      // ]);
-
-      const sendMessage = async (
-        content,
-        isOption = false,
-        isComparison = false
-      ) => {
-        if (!session || !fingerprint || (!content.trim() && !isOption)) return;
-        const currentMessages = [...messages];
-        const userRole = getUserRole(currentMessages);
-        if (!isOption && currentMessages.length === 1) {
-          toast.error("Please select one of the options first!");
-          return;
-        }
-        setMessageInput("");
-        setIsLoading(true);
+  
+      if (isComparison) {
+        const wsUrl = constructCompTextGenWebSocketUrl();
+        const ws = new WebSocket(wsUrl, "graphql-ws");
+  
+        let ongoingMessageIndex = null; // To track the ongoing AI message index
+        const receivedChunks = new Set(); // To track unique chunks and prevent duplicates
+  
         try {
-          const userMessage = { Type: "human", Content: content };
-          setMessages((prev) => [...prev, userMessage]);
-      
-          const requestBody = isComparison
-            ? {
-                comparison: true,
-                message_content: content,
-                user_role: getUserRole([...currentMessages, userMessage]),
-                criteria: selectedCriteria,
-              }
-            : {
-                message_content: content,
-                user_role: getUserRole([...currentMessages, userMessage]),
-              };
-      
-          const response = await fetch(
-            `${
-              process.env.NEXT_PUBLIC_API_ENDPOINT
-            }user/text_generation?session_id=${encodeURIComponent(
-              session
-            )}&user_info=${encodeURIComponent(fingerprint)}`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(requestBody),
-            }
-          );
-      
-          if (!response.ok) {
-            const error = await response.json();
-            console.log("response", error);
-            throw new Error(error || `HTTP error! status: ${response.status}`);
-          }
-      
-          const data = await response.json();
-      
-          if (isComparison) {
-            const wsUrl = constructCompTextGenWebSocketUrl();
-            const ws = new WebSocket(wsUrl, "graphql-ws");
-      
-            let ongoingMessageIndex = null; // To track the ongoing AI message index
-      
-            try {
-              await new Promise((resolve, reject) => {
-                ws.onopen = () => {
-                  console.log("WebSocket connection established");
-      
-                  // Initialize the WebSocket connection
-                  const initMessage = { type: "connection_init" };
-                  console.log("Sent:", initMessage); // Log the sent message
-                  ws.send(JSON.stringify(initMessage));
-      
-                  // Send the subscription message
-                  const subscriptionMessage = {
-                    id: session,
-                    type: "start",
-                    payload: {
-                      data: `{"query":"subscription OnNotify($sessionId: String!) { onNotify(sessionId: $sessionId) { message sessionId } }","variables":{"sessionId":"${session}"}}`,
-                      extensions: {
-                        authorization: {
-                          Authorization: "API_KEY=", // Replace with your actual API key
-                          host: new URL(process.env.NEXT_PUBLIC_APPSYNC_API_URL).hostname,
-                        },
-                      },
+          await new Promise((resolve, reject) => {
+            ws.onopen = () => {
+              console.log("WebSocket connection established");
+  
+              // Initialize the WebSocket connection
+              const initMessage = { type: "connection_init" };
+              console.log("Sent:", initMessage);
+              ws.send(JSON.stringify(initMessage));
+  
+              // Send the subscription message
+              const subscriptionMessage = {
+                id: session,
+                type: "start",
+                payload: {
+                  data: `{"query":"subscription OnNotify($sessionId: String!) { onNotify(sessionId: $sessionId) { message sessionId } }","variables":{"sessionId":"${session}"}}`,
+                  extensions: {
+                    authorization: {
+                      Authorization: "API_KEY=", // Replace with your actual API key
+                      host: new URL(process.env.NEXT_PUBLIC_APPSYNC_API_URL).hostname,
                     },
-                  };
-                  console.log("Sent:", subscriptionMessage); // Log the sent message
-                  ws.send(JSON.stringify(subscriptionMessage));
-                };
-      
-                ws.onmessage = (event) => {
-                  const message = JSON.parse(event.data);
-                  console.log("Received:", message); // Log the received message
-      
-                  if (message.type === "data" && message.payload?.data?.onNotify) {
-                    const receivedMessage = message.payload.data.onNotify.message;
-      
-                    // Append the received message to the ongoing AI message block, formatted as Markdown
-                    setMessages((prev) => {
-                      const newMessages = [...prev];
-      
-                      if (ongoingMessageIndex === null) {
-                        // Add a new AI message block if none exists
-                        ongoingMessageIndex = newMessages.length;
-                        newMessages.push({
-                          Type: "ai",
-                          Content: receivedMessage, // Initial message content
-                        });
-                      } else {
-                        // Append to the existing AI message block
-                        newMessages[ongoingMessageIndex].Content += `\n${receivedMessage}`; // Append with new line
+                  },
+                },
+              };
+              console.log("Sent:", subscriptionMessage);
+              ws.send(JSON.stringify(subscriptionMessage));
+            };
+            let closeTimer;
+            ws.onmessage = (event) => {
+              const message = JSON.parse(event.data);
+              console.log("Received:", message);
+
+              if (closeTimer) clearTimeout(closeTimer);
+              closeTimer = setTimeout(() => {
+                ws.close();
+                console.log("WebSocket closed due to inactivity.");
+              }, 45000);
+
+              if (message.type === "data" && message.payload?.data?.onNotify) {
+                const receivedMessage = message.payload.data.onNotify.message;
+  
+                if (!receivedChunks.has(receivedMessage)) {
+                  receivedChunks.add(receivedMessage); // Add to the set to avoid duplicates
+  
+                  setMessages((prev) => {
+                    const newMessages = [...prev];
+  
+                    if (
+                      ongoingMessageIndex === null || // No ongoing index
+                      ongoingMessageIndex >= newMessages.length || // Invalid index
+                      newMessages[ongoingMessageIndex]?.Type !== "ai" // Wrong message type
+                    ) {
+                      // Start a new AI message block
+                      ongoingMessageIndex = newMessages.length;
+                      newMessages.push({
+                        Type: "ai",
+                        Content: receivedMessage,
+                      });
+                    } else {
+                      // Append to the existing AI message block if unique
+                      const currentContent = newMessages[ongoingMessageIndex].Content;
+                      if (!currentContent.endsWith(receivedMessage)) {
+                        newMessages[ongoingMessageIndex].Content += receivedMessage;
                       }
-      
-                      return newMessages;
-                    });
-                  }
-                };
-      
-                ws.onerror = (error) => {
-                  console.error("WebSocket error:", error);
-                  ws.close(); // Close the WebSocket on error
-                  reject(error); // Reject the promise
-                };
-      
-                ws.onclose = () => {
-                  console.log("WebSocket connection closed");
-                  resolve(); // Resolve the promise on close
-                };
-      
-                // Set a timeout to reject the promise if the connection hangs
-                setTimeout(() => {
-                  console.error("WebSocket connection timeout");
-                  ws.close(); // Close the WebSocket on timeout
-                  reject(new Error("WebSocket connection timeout"));
-                }, 180000); // 3 minutes timeout
-              });
-            } catch (error) {
-              console.error("Error handling WebSocket:", error.message);
-              toast.error(error.message);
-            } finally {
-              ws.close(); // Ensure WebSocket is closed in all cases
-              setIsLoading(false);
-            }
-          } else {
-            setMessages((prev) => [
-              ...prev,
-              {
-                Type: "ai",
-                Content: data.content,
-                Options: data.options || [],
-                user_role: data.user_role,
-              },
-            ]);
-          }
+                    }
+  
+                    return newMessages;
+                  });
+                } else {
+                  console.warn("Duplicate message skipped:", receivedMessage);
+                }
+              } else {
+                console.warn("Unexpected WebSocket message:", message);
+              }
+            };
+  
+            ws.onerror = (error) => {
+              console.error("WebSocket error:", error);
+              ws.close();
+              reject(error); // Reject the promise
+            };
+  
+            ws.onclose = () => {
+              console.log("WebSocket connection closed");
+              resolve(); // Resolve the promise on close
+            };
+  
+            // Set a timeout to reject the promise if the connection hangs
+            setTimeout(() => {
+              console.error("WebSocket connection timeout");
+              ws.close();
+              reject(new Error("WebSocket connection timeout"));
+            }, 980000000); // 3 minutes timeout
+          });
         } catch (error) {
-          console.error("Error in sendMessage:", error.message);
+          console.error("Error handling WebSocket:", error.message);
           toast.error(error.message);
         } finally {
-          setIsLoading(false);
+          ws.close(); // Ensure WebSocket is closed in all cases
         }
-      };
+      } else {
+        // Handle the non-comparison case
+        const data = await response.json();
+        setMessages((prev) => [
+          ...prev,
+          {
+            Type: "ai",
+            Content: data.content,
+            Options: data.options || [],
+            user_role: data.user_role,
+          },
+        ]);
+      }
     } catch (error) {
       console.error("Error in sendMessage:", error.message);
       toast.error(error.message);
@@ -343,7 +446,10 @@ const Chat = ({ setPage }) => {
       setIsLoading(false);
     }
   };
-      
+
+  
+
+  
 
   const handleKeyPress = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -624,7 +730,7 @@ const Chat = ({ setPage }) => {
 
         setTimeout(() => {
           reject(new Error("WebSocket connection timeout"));
-        }, 180000);
+        }, 980000000);
       });
       setMessages((prev) => {
         const index = [...prev]

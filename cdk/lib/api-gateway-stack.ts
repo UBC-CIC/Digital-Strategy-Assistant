@@ -789,7 +789,7 @@ export class ApiGatewayStack extends cdk.Stack {
       {
         parameterName: `/${id}/DSA/BedrockLLMId`,
         description: "Parameter containing the Bedrock LLM ID",
-        stringValue: "us.meta.llama3-2-90b-instruct-v1:0",
+        stringValue: "mistral.mistral-large-2407-v1:0",
       }
     );
     const embeddingModelParameter = new ssm.StringParameter(
@@ -818,7 +818,7 @@ export class ApiGatewayStack extends cdk.Stack {
       {
         code: lambda.DockerImageCode.fromImageAsset("./comparison_text_generation"),
         memorySize: 2048,
-        timeout: cdk.Duration.seconds(300),
+        timeout: cdk.Duration.seconds(900),
         vpc: vpcStack.vpc, // Pass the VPC
         functionName: `${id}-documentCompFunction`,
         environment: {
