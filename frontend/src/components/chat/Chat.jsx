@@ -628,7 +628,7 @@ const Chat = ({ setPage }) => {
     urlObj.hostname = modifiedHost;
     const host = tmpObj.hostname;
     // Get credentials from Cognito Identity Pool
-    const credentials = null;
+    let credentials = null;
     try {
       // Get credentials from an async function but handle it synchronously
       // since constructWebSocketUrl isn't async
