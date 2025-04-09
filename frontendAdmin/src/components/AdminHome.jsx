@@ -7,7 +7,7 @@ import Categories from "./categories/Categories.jsx";
 import Prompt from "./prompt/Prompt.jsx";
 import Files from "./files/Files.jsx";
 import Sidebar from "./Sidebar.jsx";
-import { Auth } from 'aws-amplify';
+import { getCurrentCredentials } from 'aws-amplify/auth';
 import aws4 from 'aws4';
 import Header from "./Header.jsx";
 import PostAuthHeader from "./PostAuthHeader.jsx";
@@ -52,20 +52,19 @@ const AdminHome = () => {
 
 
   async function constructWebSocketUrl() {
-    // Get the AppSync API endpoint (e.g. "https://xyz.appsync-api.region.amazonaws.com/graphql")
+    // Get the AppSync API endpoint
     const tempUrl = process.env.NEXT_PUBLIC_APPSYNC_API_URL;
     
-    // Replace HTTPS with WSS and change hostname for realtime connections.
+    // Replace HTTPS with WSS and change hostname for realtime connections
     const apiUrl = tempUrl.replace(/^https:\/\//, "wss://");
     const urlObj = new URL(apiUrl);
     const originalUrl = new URL(tempUrl);
-    // Replace "appsync-api" with "appsync-realtime-api" for the WebSocket endpoint.
     urlObj.hostname = urlObj.hostname.replace("appsync-api", "appsync-realtime-api");
     
-    // Retrieve the temporary credentials from Amplify.
-    const credentials = await Auth.currentCredentials();
+    // Retrieve the temporary credentials from Amplify
+    const credentials = await getCurrentCredentials();
     
-    // Construct the options for signing (a dummy GET request on /graphql)
+    // Construct the options for signing
     const opts = {
       host: originalUrl.hostname,
       method: 'GET',
@@ -74,18 +73,17 @@ const AdminHome = () => {
       region: process.env.NEXT_PUBLIC_AWS_REGION,
     };
     
-    // Sign the options using aws4.
+    // Sign the options using aws4
     aws4.sign(opts, {
       accessKeyId: credentials.accessKeyId,
       secretAccessKey: credentials.secretAccessKey,
       sessionToken: credentials.sessionToken,
     });
     
-    // Base64-encode the headers; "e30=" is the encoding for an empty JSON {}
+    // Base64-encode the headers
     const encodedHeader = btoa(JSON.stringify(opts.headers));
     const payload = "e30=";
     
-    // Return the complete WebSocket URL.
     return `${urlObj.toString()}?header=${encodedHeader}&payload=${payload}`;
   }
 
