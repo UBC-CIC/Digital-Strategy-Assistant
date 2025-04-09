@@ -6,4 +6,4 @@ pymupdf
 psycopg[binary,pool]
 psycopg2-binary
 httpx
-httpx-aws4auth
+requests-aws4auth

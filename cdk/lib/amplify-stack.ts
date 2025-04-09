@@ -145,6 +145,8 @@ import {
   
       amplifyApp.addBranch("main");
       amplifyAppAdmin.addBranch("main");
+      amplifyApp.addBranch("appsync");
+      amplifyAppAdmin.addBranch("appsync");
       
     }
   }
