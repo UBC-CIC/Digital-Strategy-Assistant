@@ -6,27 +6,39 @@ import logging
 import re
 import psycopg2
 import time
-import httpx
+import httpx, zipfile
+from httpx_aws4auth import AWS4Auth
 import zipfile
 from datetime import datetime, timezone
 from boto3.dynamodb.conditions import Key
 
-
+aws_region = os.environ.get("REGION")
 S3_BUCKET = os.environ.get("CHATLOGS_BUCKET")
 DB_SECRET_NAME = os.environ.get("SM_DB_CREDENTIALS")
 RDS_PROXY_ENDPOINT = os.environ.get("RDS_PROXY_ENDPOINT")
 TABLE_NAME = os.environ.get("TABLE_NAME")
 APPSYNC_API_URL = os.environ.get("APPSYNC_API_URL")
-API_KEY = os.environ.get("API_KEY")
 
 if not TABLE_NAME:
     raise ValueError("TABLE_NAME environment variable is required but not set.")
 
 # Initialize AWS Clients
+session_boto = boto3.Session()
+credentials = session_boto.get_credentials().get_frozen_credentials()
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
 s3_client = boto3.client("s3")
 secrets_manager_client = boto3.client("secretsmanager")
+
+# Create an AWS4Auth object.
+
+aws4auth = AWS4Auth(
+    credentials.access_key,
+    credentials.secret_key,
+    aws_region,
+    "appsync",
+    session_token=credentials.token
+)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -394,7 +406,8 @@ def create_zip_for_session(session_id, csv_files):
 
 def invoke_event_notification(session_id, message):
     """
-    Publish a notification event to AppSync via HTTPX (directly to the AppSync API).
+    Publish a notification event to AppSync via HTTPX (directly to the AppSync API)
+    using SigV4 signing with AWS_IAM.
     """
     try:
         query = """
@@ -405,11 +418,6 @@ def invoke_event_notification(session_id, message):
             }
         }
         """
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": API_KEY
-        }
-
         payload = {
             "query": query,
             "variables": {
@@ -418,18 +426,23 @@ def invoke_event_notification(session_id, message):
             }
         }
 
-        # Send the request to AppSync
-        with httpx.Client() as client:
+        headers = {
+            "Content-Type": "application/json"
+            # No API Key header required for IAM
+        }
+
+        # Sign the request using httpx with the aws4auth object.
+        with httpx.Client(auth=aws4auth) as client:
             response = client.post(APPSYNC_API_URL, headers=headers, json=payload)
             response_data = response.json()
-
+        
             logging.info(f"AppSync Response: {json.dumps(response_data, indent=2)}")
             if response.status_code != 200 or "errors" in response_data:
                 raise Exception(f"Failed to send notification: {response_data}")
-
+        
             print(f"Notification sent successfully: {response_data}")
             return response_data["data"]["sendNotification"]
-
+    
     except Exception as e:
         logging.error(f"Error publishing event to AppSync: {str(e)}")
         raise

@@ -7,6 +7,8 @@ import Categories from "./categories/Categories.jsx";
 import Prompt from "./prompt/Prompt.jsx";
 import Files from "./files/Files.jsx";
 import Sidebar from "./Sidebar.jsx";
+import { Auth } from 'aws-amplify';
+import aws4 from 'aws4';
 import Header from "./Header.jsx";
 import PostAuthHeader from "./PostAuthHeader.jsx";
 import History from "./history/History.jsx";
@@ -49,28 +51,43 @@ const AdminHome = () => {
   }, []);
 
 
-  function constructWebSocketUrl() {
-    const tempUrl = process.env.NEXT_PUBLIC_APPSYNC_API_URL; // Replace with your WebSocket URL
-    const apiUrl = tempUrl.replace("https://", "wss://");
+  async function constructWebSocketUrl() {
+    // Get the AppSync API endpoint (e.g. "https://xyz.appsync-api.region.amazonaws.com/graphql")
+    const tempUrl = process.env.NEXT_PUBLIC_APPSYNC_API_URL;
+    
+    // Replace HTTPS with WSS and change hostname for realtime connections.
+    const apiUrl = tempUrl.replace(/^https:\/\//, "wss://");
     const urlObj = new URL(apiUrl);
-    const tmpObj = new URL(tempUrl);
-    const modifiedHost = urlObj.hostname.replace(
-        "appsync-api",
-        "appsync-realtime-api"
-    );
-  
-    urlObj.hostname = modifiedHost;
-    const host = tmpObj.hostname;
-    const header = {
-        host: host,
-        Authorization: "API_KEY",
+    const originalUrl = new URL(tempUrl);
+    // Replace "appsync-api" with "appsync-realtime-api" for the WebSocket endpoint.
+    urlObj.hostname = urlObj.hostname.replace("appsync-api", "appsync-realtime-api");
+    
+    // Retrieve the temporary credentials from Amplify.
+    const credentials = await Auth.currentCredentials();
+    
+    // Construct the options for signing (a dummy GET request on /graphql)
+    const opts = {
+      host: originalUrl.hostname,
+      method: 'GET',
+      path: '/graphql',
+      service: 'appsync',
+      region: process.env.NEXT_PUBLIC_AWS_REGION,
     };
-  
-    const encodedHeader = btoa(JSON.stringify(header));
+    
+    // Sign the options using aws4.
+    aws4.sign(opts, {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken,
+    });
+    
+    // Base64-encode the headers; "e30=" is the encoding for an empty JSON {}
+    const encodedHeader = btoa(JSON.stringify(opts.headers));
     const payload = "e30=";
-  
+    
+    // Return the complete WebSocket URL.
     return `${urlObj.toString()}?header=${encodedHeader}&payload=${payload}`;
-  };
+  }
 
   const removeCompletedNotification = async () => {
     try {
@@ -96,80 +113,50 @@ const AdminHome = () => {
     }
   };
 
-  function openWebSocket(session_id, setNotificationForSession, onComplete) {
-    // Open WebSocket connection
-    const wsUrl = constructWebSocketUrl();
+  async function openWebSocket(session_id, setNotificationForSession, onComplete) {
+    // Get the signed WebSocket URL (await the async function).
+    const wsUrl = await constructWebSocketUrl();
     const ws = new WebSocket(wsUrl, "graphql-ws");
   
-    // Handle WebSocket connection
     ws.onopen = () => {
-  
-      // Initialize WebSocket connection
+      // Initialize connection.
       const initMessage = { type: "connection_init" };
       ws.send(JSON.stringify(initMessage));
   
-      // Subscribe to notifications
+      // Create a subscription message.
       const subscriptionId = uuidv4();
       const subscriptionMessage = {
-          id: subscriptionId,
-          type: "start",
-          payload: {
-            data: JSON.stringify({
-              query: `subscription OnNotify($sessionId: String!) {
-                onNotify(sessionId: $sessionId) {
-                  message
-                  sessionId
-                }
-              }`,
-              variables: { sessionId: session_id },
-            }),
-            extensions: {
-              authorization: {
-                Authorization: "API_KEY=",
-                host: new URL(process.env.NEXT_PUBLIC_APPSYNC_API_URL)
-                  .hostname,
-              },
-            },
-          },
+        id: subscriptionId,
+        type: "start",
+        payload: {
+          data: JSON.stringify({
+            query: `subscription OnNotify($sessionId: String!) {
+              onNotify(sessionId: $sessionId) {
+                message
+                sessionId
+              }
+            }`,
+            variables: { sessionId: session_id },
+          }),
+          // Remove the extensions section since signing is done in the URL.
+        },
       };
   
       ws.send(JSON.stringify(subscriptionMessage));
-      
     };
   
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
-      
-  
-      // Handle notification
       if (message.type === "data" && message.payload?.data?.onNotify) {
-        const receivedMessage = message.payload.data.onNotify.message;
-        
-        
-        // Sets icon to show new file on ChatLogs page
+        // Handle notification message.
         setNotificationForSession(true);
-        
-        // Remove row from database
-        removeCompletedNotification();
-  
-        // Notify the instructor
+        // Optionally, show a toast message.
         toast.success("Chat logs are now available!", {
           position: "top-center",
           autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-          theme: "colored",
         });
-        
-  
-        // Close WebSocket after receiving the notification
+        // Close the WebSocket once you receive the notification.
         ws.close();
-        
-  
-        // Call the callback function after WebSocket completes
         if (typeof onComplete === "function") {
           onComplete();
         }
@@ -185,14 +172,14 @@ const AdminHome = () => {
       console.log("WebSocket closed");
     };
   
-    // Set a timeout to close the WebSocket if no message is received
+    // Set a timeout to close the WebSocket if no message is received (3 minutes).
     setTimeout(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            console.warn("WebSocket timeout reached, closing connection");
-            ws.close();
-        }
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        console.warn("WebSocket timeout reached, closing connection");
+        ws.close();
+      }
     }, 180000);
-  };
+  }
   
   const checkNotificationStatus = async (token) => {
     

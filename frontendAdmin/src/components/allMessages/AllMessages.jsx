@@ -154,9 +154,9 @@ export default function AllMessages({ notifications, setNotifications, openWebSo
       if (response.ok) {
         
         setIsDownloadEnabled(false);
-        openWebSocket(session_id, setNotificationForSession, () => {
-          
+        await openWebSocket(session_id, setNotificationForSession, () => {
           setTimeout(() => {
+            // Optionally, refresh status
             checkNotificationStatus();
             fetchPreviousFiles();
           }, 2000);

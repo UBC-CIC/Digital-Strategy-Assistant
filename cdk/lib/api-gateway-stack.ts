@@ -257,27 +257,18 @@ export class ApiGatewayStack extends cdk.Stack {
       },
     });
 
-    const authHandler = new lambda.Function(this, `${id}-AuthHandler`, {
-      runtime: lambda.Runtime.NODEJS_20_X,
-      code: lambda.Code.fromAsset("lambda/lib"),
-      handler: "appsync.handler",
-      functionName: `${id}-AuthHandler`,
-    });
-  
 
     this.eventApi = new appsync.GraphqlApi(this, `${id}-EventApi`, {
       name: `${id}-EventApi`,
       definition: appsync.Definition.fromFile("./graphql/schema.graphql"),
       authorizationConfig: {
         defaultAuthorization: {
-          authorizationType: appsync.AuthorizationType.LAMBDA,
-          lambdaAuthorizerConfig: {
-            handler: authHandler,
-          },
+          authorizationType: appsync.AuthorizationType.IAM,
         },
       },
       xrayEnabled: true,
     });
+    
 
     this.downloadMessagesApi = new appsync.GraphqlApi(
       this,
@@ -287,10 +278,7 @@ export class ApiGatewayStack extends cdk.Stack {
         definition: appsync.Definition.fromFile("./graphql/schema.graphql"),
         authorizationConfig: {
           defaultAuthorization: {
-            authorizationType: appsync.AuthorizationType.LAMBDA,
-            lambdaAuthorizerConfig: {
-              handler: authHandler,
-            },
+            authorizationType: appsync.AuthorizationType.IAM,
           },
         },
         xrayEnabled: true,
@@ -302,10 +290,7 @@ export class ApiGatewayStack extends cdk.Stack {
       definition: appsync.Definition.fromFile("./graphql/schema.graphql"),
       authorizationConfig: {
         defaultAuthorization: {
-          authorizationType: appsync.AuthorizationType.LAMBDA,
-          lambdaAuthorizerConfig: {
-            handler: authHandler,
-          },
+          authorizationType: appsync.AuthorizationType.IAM,
         },
       },
       xrayEnabled: true,
@@ -821,7 +806,7 @@ export class ApiGatewayStack extends cdk.Stack {
       {
         parameterName: `/${id}/DSA/BedrockLLMId`,
         description: "Parameter containing the Bedrock LLM ID",
-        stringValue: "meta.llama3-70b-instruct-v1:0",
+        stringValue: "meta.llama3-3-70b-instruct-v1:0",
       }
     );
     const embeddingModelParameter = new ssm.StringParameter(
@@ -1007,26 +992,12 @@ export class ApiGatewayStack extends cdk.Stack {
       resources: [
         "arn:aws:bedrock:" +
           this.region +
-          "::foundation-model/meta.llama3-70b-instruct-v1:0",
+          "::foundation-model/meta.llama3-3-70b-instruct-v1:0",
         "arn:aws:bedrock:" +
           this.region +
           "::foundation-model/amazon.titan-embed-text-v2:0",
       ],
     });
-
-
-
-    // const inferencePolicyStatement = new iam.PolicyStatement({
-    //   effect: iam.Effect.ALLOW,
-    //   actions: ["bedrock:InvokeModel*", "bedrock:InvokeEndpoint"],
-    //   resources: [
-    //     // Add resources for us-west-2
-    //     "arn:aws:bedrock:us-east-1::foundation-model/*",
-    //     "arn:aws:bedrock:us-west-2::foundation-model/*",
-    //     "arn:aws:bedrock:ca-central-1::foundation-model/*",
-    //   ],
-    // });
-
 
     
 
