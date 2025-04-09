@@ -1,13 +1,12 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Login from "./auth/Login.jsx";
-import { fetchAuthSession, getCurrentCredentials } from "aws-amplify/auth";
+import { fetchAuthSession } from "aws-amplify/auth";
 import Analytics from "./analytics/Analytics.jsx";
 import Categories from "./categories/Categories.jsx";
 import Prompt from "./prompt/Prompt.jsx";
 import Files from "./files/Files.jsx";
 import Sidebar from "./Sidebar.jsx";
-import aws4 from 'aws4';
 import Header from "./Header.jsx";
 import PostAuthHeader from "./PostAuthHeader.jsx";
 import History from "./history/History.jsx";
@@ -20,7 +19,6 @@ import LoadingScreen from "./Loading/LoadingScreen.jsx";
 import Feedback from "./feedback/Feedback.jsx";
 import Guidelines from "./guidelines/Guidelines.jsx";
 import { v4 as uuidv4 } from 'uuid';
-
 const AdminHome = () => {
   const [user, setUser] = useState(null);
   const [userGroup, setUserGroup] = useState(null);
@@ -28,8 +26,6 @@ const AdminHome = () => {
   const [nextCategoryNumber, setNextCategoryNumber] = useState(1);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [notificationForSession, setNotificationForSession] = useState(false);
-
   useEffect(() => {
     const fetchAuthData = () => {
       fetchAuthSession()
@@ -38,7 +34,7 @@ const AdminHome = () => {
             const group = tokens.accessToken.payload["cognito:groups"];
             setUser(tokens.accessToken.payload);
             setUserGroup(group || []);
-            checkNotificationStatus(tokens.idToken.toString());
+            checkNotificationStatus(tokens.idToken);
           }
         })
         .catch((error) => {
@@ -53,48 +49,33 @@ const AdminHome = () => {
   }, []);
 
 
-  async function constructWebSocketUrl() {
-    // Get the AppSync API endpoint (e.g. "https://xyz.appsync-api.region.amazonaws.com/graphql")
-    const tempUrl = process.env.NEXT_PUBLIC_APPSYNC_API_URL;
-    
-    // Replace HTTPS with WSS and change hostname for realtime connections.
-    const apiUrl = tempUrl.replace(/^https:\/\//, "wss://");
+  function constructWebSocketUrl() {
+    const tempUrl = process.env.NEXT_PUBLIC_APPSYNC_API_URL; // Replace with your WebSocket URL
+    const apiUrl = tempUrl.replace("https://", "wss://");
     const urlObj = new URL(apiUrl);
-    const originalUrl = new URL(tempUrl);
-    // Replace "appsync-api" with "appsync-realtime-api" for the WebSocket endpoint.
-    urlObj.hostname = urlObj.hostname.replace("appsync-api", "appsync-realtime-api");
-    
-    // Retrieve the temporary credentials from Amplify.
-    const credentials = await getCurrentCredentials();
-    
-    // Construct the options for signing (a dummy GET request on /graphql)
-    const opts = {
-      host: originalUrl.hostname,
-      method: 'GET',
-      path: '/graphql',
-      service: 'appsync',
-      region: process.env.NEXT_PUBLIC_AWS_REGION,
+    const tmpObj = new URL(tempUrl);
+    const modifiedHost = urlObj.hostname.replace(
+        "appsync-api",
+        "appsync-realtime-api"
+    );
+  
+    urlObj.hostname = modifiedHost;
+    const host = tmpObj.hostname;
+    const header = {
+        host: host,
+        Authorization: "API_KEY",
     };
-    
-    // Sign the options using aws4.
-    aws4.sign(opts, {
-      accessKeyId: credentials.accessKeyId,
-      secretAccessKey: credentials.secretAccessKey,
-      sessionToken: credentials.sessionToken,
-    });
-    
-    // Base64-encode the headers; "e30=" is the encoding for an empty JSON {}
-    const encodedHeader = btoa(JSON.stringify(opts.headers));
+  
+    const encodedHeader = btoa(JSON.stringify(header));
     const payload = "e30=";
-    
-    // Return the complete WebSocket URL.
+  
     return `${urlObj.toString()}?header=${encodedHeader}&payload=${payload}`;
-  }
+  };
 
   const removeCompletedNotification = async () => {
     try {
       const session = await fetchAuthSession();
-      const token = session.tokens.idToken.toString();
+      const token = session.tokens.idToken;
   
       // Make DELETE request without session_id (deletes all completed notifications)
       const response = await fetch(
@@ -115,50 +96,80 @@ const AdminHome = () => {
     }
   };
 
-  async function openWebSocket(session_id, setNotificationForSession, onComplete) {
-    // Get the signed WebSocket URL (await the async function).
-    const wsUrl = await constructWebSocketUrl();
+  function openWebSocket(session_id, setNotificationForSession, onComplete) {
+    // Open WebSocket connection
+    const wsUrl = constructWebSocketUrl();
     const ws = new WebSocket(wsUrl, "graphql-ws");
   
+    // Handle WebSocket connection
     ws.onopen = () => {
-      // Initialize connection.
+  
+      // Initialize WebSocket connection
       const initMessage = { type: "connection_init" };
       ws.send(JSON.stringify(initMessage));
   
-      // Create a subscription message.
+      // Subscribe to notifications
       const subscriptionId = uuidv4();
       const subscriptionMessage = {
-        id: subscriptionId,
-        type: "start",
-        payload: {
-          data: JSON.stringify({
-            query: `subscription OnNotify($sessionId: String!) {
-              onNotify(sessionId: $sessionId) {
-                message
-                sessionId
-              }
-            }`,
-            variables: { sessionId: session_id },
-          }),
-          // Remove the extensions section since signing is done in the URL.
-        },
+          id: subscriptionId,
+          type: "start",
+          payload: {
+            data: JSON.stringify({
+              query: `subscription OnNotify($sessionId: String!) {
+                onNotify(sessionId: $sessionId) {
+                  message
+                  sessionId
+                }
+              }`,
+              variables: { sessionId: session_id },
+            }),
+            extensions: {
+              authorization: {
+                Authorization: "API_KEY=",
+                host: new URL(process.env.NEXT_PUBLIC_APPSYNC_API_URL)
+                  .hostname,
+              },
+            },
+          },
       };
   
       ws.send(JSON.stringify(subscriptionMessage));
+      
     };
   
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
+      
+  
+      // Handle notification
       if (message.type === "data" && message.payload?.data?.onNotify) {
-        // Handle notification message.
+        const receivedMessage = message.payload.data.onNotify.message;
+        
+        
+        // Sets icon to show new file on ChatLogs page
         setNotificationForSession(true);
-        // Optionally, show a toast message.
+        
+        // Remove row from database
+        removeCompletedNotification();
+  
+        // Notify the instructor
         toast.success("Chat logs are now available!", {
           position: "top-center",
           autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+          theme: "colored",
         });
-        // Close the WebSocket once you receive the notification.
+        
+  
+        // Close WebSocket after receiving the notification
         ws.close();
+        
+  
+        // Call the callback function after WebSocket completes
         if (typeof onComplete === "function") {
           onComplete();
         }
@@ -174,16 +185,17 @@ const AdminHome = () => {
       console.log("WebSocket closed");
     };
   
-    // Set a timeout to close the WebSocket if no message is received (3 minutes).
+    // Set a timeout to close the WebSocket if no message is received
     setTimeout(() => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        console.warn("WebSocket timeout reached, closing connection");
-        ws.close();
-      }
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            console.warn("WebSocket timeout reached, closing connection");
+            ws.close();
+        }
     }, 180000);
-  }
+  };
   
   const checkNotificationStatus = async (token) => {
+    
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_ENDPOINT}admin/csv`,
@@ -195,6 +207,8 @@ const AdminHome = () => {
       if (response.ok) {
         const data = await response.json();
         if (data.completionStatus === true) {
+          
+
           // Sets icon to show new file on Allmessages page
           setNotificationForSession(true);
 
@@ -212,16 +226,20 @@ const AdminHome = () => {
             progress: undefined,
             theme: "colored",
           });
-        } else if (data.completionStatus === false && data.session_id) {
+          
+
+        } else if (data.completionStatus === false) {
           // Reopen WebSocket to listen for notifications
-          openWebSocket(data.session_id, setNotificationForSession);
+          
+          openWebSocket(session_id, setNotificationForSession);
         } else {
-          console.log("Either chatlogs were not requested or instructor already received notification. No need to notify instructor or re-open websocket.");
+          console.log(`Either chatlogs for  were not requested or instructor already received notification. No need to notify instructor or re-open websocket.`);
         }
       }
     } catch (error) {
-      console.error("Error checking notification status:", error);
+      console.error("Error checking notification status for", error);
     }
+    
   };
 
   const getHomePage = () => {

@@ -63,5 +63,24 @@ export const createRolesAndPolicies = (
     ),
   });
 
+  // Add permissions to access WebSocket API
+  unauthenticatedRole.attachInlinePolicy(
+    new iam.Policy(scope, `${id}-UnauthPolicy`, {
+      statements: [
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "execute-api:ManageConnections",
+            "execute-api:Invoke"
+          ],
+          resources: [
+            `arn:aws:execute-api:${region}:${account}:${apiRestApiId}/*/*/user/*`,
+            `arn:aws:execute-api:${region}:${account}:${apiRestApiId}/@connections/*`
+          ],
+        }),
+      ],
+    })
+  );
+
   return { adminRole, unauthenticatedRole };
 };

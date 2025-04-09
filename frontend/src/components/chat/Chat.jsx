@@ -22,7 +22,17 @@ import { processAndUploadFiles } from "./Utility";
 import { getUserRole } from "./Utility";
 import { TbLayersDifference } from "react-icons/tb";
 
-
+// Function to get credentials for WebSocket connection
+async function getWebSocketCredentials() {
+  try {
+    const session = await fetchAuthSession();
+    const credentials = session.credentials;
+    return credentials;
+  } catch (error) {
+    console.error('Error getting credentials:', error);
+    return null;
+  }
+}
 
 // "Processing document..." animation
 const TypingIndicatorProcessing = () => (
@@ -137,7 +147,7 @@ const Chat = ({ setPage }) => {
   };
 
 
-  const constructCompTextGenWebSocketUrl = () => {
+  const constructCompTextGenWebSocketUrl = async () => {
     const tempUrl = process.env.NEXT_PUBLIC_APPSYNC_API_URL;
     const apiUrl = tempUrl.replace("https://", "wss://");
     const urlObj = new URL(apiUrl);
@@ -146,17 +156,22 @@ const Chat = ({ setPage }) => {
       "appsync-api",
       "appsync-realtime-api"
     );
-
+  
     urlObj.hostname = modifiedHost;
     const host = tmpObj.hostname;
+    
+    // Get credentials from Cognito Identity Pool
+    const credentials = await getWebSocketCredentials();
+    
+    // Only use credentials without fallback to static key
     const header = {
       host: host,
-      Authorization: "API_KEY=",
+      Authorization: credentials ? `Bearer ${credentials.sessionToken}` : "",
     };
-
+  
     const encodedHeader = btoa(JSON.stringify(header));
     const payload = "e30=";
-
+  
     return `${urlObj.toString()}?header=${encodedHeader}&payload=${payload}`;
   };
 
@@ -612,9 +627,23 @@ const Chat = ({ setPage }) => {
 
     urlObj.hostname = modifiedHost;
     const host = tmpObj.hostname;
+    // Get credentials from Cognito Identity Pool
+    const credentials = null;
+    try {
+      // Get credentials from an async function but handle it synchronously
+      // since constructWebSocketUrl isn't async
+      getWebSocketCredentials().then(creds => {
+        credentials = creds;
+      }).catch(error => {
+        console.error('Error getting WebSocket credentials:', error);
+      });
+    } catch (error) {
+      console.error('Error in credentials retrieval:', error);
+    }
+    // Only use credentials without fallback to static key
     const header = {
       host: host,
-      Authorization: "API_KEY=",
+      Authorization: credentials ? `Bearer ${credentials.sessionToken}` : "",
     };
 
     const encodedHeader = btoa(JSON.stringify(header));

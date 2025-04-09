@@ -14,7 +14,8 @@ Amplify.configure({
       region: process.env.NEXT_PUBLIC_AWS_REGION,
       userPoolClientId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID,
       userPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID,
-      allowGuestAccess: false,
+      allowGuestAccess: true,
+      identityPoolId: process.env.NEXT_PUBLIC_IDENTITY_POOL_ID, 
     },
   },
 });
