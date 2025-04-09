@@ -124,6 +124,17 @@ const SignIn = ({
           SIGN IN
         </Button>
       </form>
+      <div className="mt-2">
+         <p className="text-sm text-gray-600">
+           Don't have an account?{" "}
+           <a
+             onClick={() => setAuthState("signup")}
+             className="text-blue-600 hover:underline cursor-pointer"
+           >
+             Sign up
+           </a>
+         </p>
+       </div>
     </div>
   );
 };
