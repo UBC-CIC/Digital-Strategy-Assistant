@@ -119,7 +119,7 @@ N/A
 
 ## Credits
 
-This application was architected and developed by [Kanish Khanna](https://www.linkedin.com/in/kanishkhanna/), [Sean Woo](https://www.linkedin.com/in/seanwoo4/), [Aurora Cheng](https://www.linkedin.com/in/aurora-cheng04/), [Harshinee Sriram](https://www.linkedin.com/in/harshineesriram/), and [Aman Prakash](https://www.linkedin.com/in/aman-prakash-aa48b421b/), with project assistance by [Amy Cao](https://www.linkedin.com/in/amy-c-2313121b1/). Thanks to the UBC Cloud Innovation Centre Technical and Project Management teams for their guidance and support.
+This application was architected and developed by [Kanish Khanna](https://www.linkedin.com/in/kanishkhanna/), [Sean Woo](https://www.linkedin.com/in/seanwoo4/), and [Harshinee Sriram](https://www.linkedin.com/in/harshineesriram/), with project assistance by [Amy Cao](https://www.linkedin.com/in/amy-c-2313121b1/). Thanks to the UBC Cloud Innovation Centre Technical and Project Management teams for their guidance and support.
 
 ## License
 
